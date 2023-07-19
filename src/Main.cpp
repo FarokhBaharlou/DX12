@@ -73,7 +73,99 @@ bool g_TearingSupported = false;
 bool g_Fullscreen = false;
 
 // window callback function.
-LRESULT CALLBACK WndProc(HWND, UINT, WPARAM, LPARAM);
+LRESULT CALLBACK WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam) { return 0; }
+
+void ParseCommandLineArguments()
+{
+    int argc;
+    wchar_t** argv = ::CommandLineToArgvW(::GetCommandLineW(), &argc);
+
+    for (size_t i = 0; i < argc; ++i)
+    {
+        if (::wcscmp(argv[i], L"-w") == 0 || ::wcscmp(argv[i], L"--width") == 0)
+        {
+            g_ClientWidth = ::wcstol(argv[++i], nullptr, 10);
+        }
+        if (::wcscmp(argv[i], L"-h") == 0 || ::wcscmp(argv[i], L"--height") == 0)
+        {
+            g_ClientHeight = ::wcstol(argv[++i], nullptr, 10);
+        }
+        if (::wcscmp(argv[i], L"-warp") == 0 || ::wcscmp(argv[i], L"--warp") == 0)
+        {
+            g_UseWarp = true;
+        }
+    }
+    // free memory argv
+    ::LocalFree(argv);
+}
+
+// enable debug layer for dubug builds
+void EnableDebugLayer()
+{
+    #if defined(_DEBUG)
+    ComPtr<ID3D12Debug> debugInterface;
+    ThrowIfFailed(D3D12GetDebugInterface(IID_PPV_ARGS(&debugInterface)));
+    debugInterface->EnableDebugLayer();
+    #endif
+}
+
+// window class registeration
+void RegisterWindowClass(HINSTANCE hInst, const wchar_t* windowClassName)
+{
+    WNDCLASSEXW windowClass = {};
+
+    windowClass.cbSize = sizeof(WNDCLASSEX);
+    windowClass.style = CS_HREDRAW | CS_VREDRAW;
+    windowClass.lpfnWndProc = &WndProc;
+    windowClass.cbClsExtra = 0;
+    windowClass.cbWndExtra = 0;
+    windowClass.hInstance = hInst;
+    windowClass.hIcon = ::LoadIcon(hInst, NULL);
+    windowClass.hCursor = ::LoadCursor(NULL, IDC_ARROW);
+    windowClass.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
+    windowClass.lpszMenuName = NULL;
+    windowClass.lpszClassName = windowClassName;
+    windowClass.hIconSm = ::LoadIcon(hInst, NULL);
+
+    static ATOM atom = ::RegisterClassExW(&windowClass);
+    assert(atom > 0);
+}
+
+// window instance creation
+HWND CreateWindow(const wchar_t* windowClassName, HINSTANCE hInst, const wchar_t* windowTitle, uint32_t width, uint32_t height)
+{
+    int screenWidth = ::GetSystemMetrics(SM_CXSCREEN);
+    int screenHeight = ::GetSystemMetrics(SM_CYSCREEN);
+
+    RECT windowRect = { 0, 0, static_cast<LONG>(width), static_cast<LONG>(height) };
+    ::AdjustWindowRect(&windowRect, WS_OVERLAPPEDWINDOW, FALSE);
+
+    int windowWidth = windowRect.right - windowRect.left;
+    int windowHeight = windowRect.bottom - windowRect.top;
+
+    // top left point on screen
+    int windowX = std::max<int>(0, (screenWidth - windowWidth) / 2);
+    int windowY = std::max<int>(0, (screenHeight - windowHeight) / 2);
+
+    HWND hWnd = ::CreateWindowExW(
+        NULL,
+        windowClassName,
+        windowTitle,
+        WS_OVERLAPPEDWINDOW,
+        windowX,
+        windowY,
+        windowWidth,
+        windowHeight,
+        NULL,
+        NULL,
+        hInst,
+        nullptr
+    );
+
+    assert(hWnd && "Failed to create window");
+
+    return hWnd;
+}
 
 int main()
 {
